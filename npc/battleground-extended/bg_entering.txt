@@ -1,0 +1,186 @@
+// BG + PVP warper
+// By Vykimo
+
+1@pop3,49,73,0	script	Flying Sanctuary	10042,{
+warp "1@dth3",0,0;
+	OnInit:
+	OnTimer1000:
+	delwaitingroom;
+	waitingroom "Flying Sanctuary > "+ (getmapusers("1@dth3")) +" players",0;
+	initnpctimer;
+end;
+}
+1@pop3,66,73,0	script	Laboratory	10043,{
+warp "1@lab",0,0;
+	OnInit:
+	OnTimer1000:
+	delwaitingroom;
+	waitingroom "Laboratory > "+ (getmapusers("1@lab")) +" players",0;
+	initnpctimer;
+end;
+}
+1@pop3,58,77,0	script	Arene finale	10044,{
+warp "1@mir",0,0;
+	OnInit:
+	OnTimer1000:
+	delwaitingroom;
+	waitingroom "Arene finale > "+ (getmapusers("1@mir")) +" players",0;
+	initnpctimer;
+end;
+}
+
+prontera,148,174,6	script	PVP & Battleground#j	734,{
+		if(bgcheck())
+		{
+			mes "^404040[^808080" + strnpcinfo(1) + "^404040]^000000";
+			mes "You can now participate in the Battleground and win prizes with your badges. Do you want to participate in the Battleground?";
+			next;
+			menu
+			"Participate in the Battleground(^FF0000" + (bg_queue_data(getvariableofnpc(.BG_Queue,"BG_Queue_Join"),0)) + " players^000000)",L_BG,
+			"Arêne PVP Libre(^FF0000" + (getmapusers("1@dth3")+getmapusers("1@lab")+getmapusers("1@mir")) + " players^000000)",L_PVP,
+			"Cancel",-;
+			close;
+		}
+			mes "^404040[^808080" + strnpcinfo(1) + "^404040]^000000";
+			mes "Hello, I can get you into the PVP arena of the server.";
+			next;
+			menu
+			"Free PVP Arene(^FF0000" + (getmapusers("1@dth3")+getmapusers("1@lab")+getmapusers("1@mir")) + " players^000000)",L_PVP,
+			"Access the battleground room",L_BG,
+			"Cancel",-;
+			close;
+
+
+L_PVP:
+	mes "^404040[^808080" + strnpcinfo(1) + "^404040]^000000";
+	mes "PVP Rules :";
+	mes " ";
+	mes "- It is forbidden to Kill Deco (that is kill a player, then immediately disconnect to avoid being killed).";
+	mes " ";
+	mes "- It is forbidden to Kill Raise (kill and revive the same player without his consent).";
+	mes " ";
+	mes "- It is strictly forbidden to Double Account to booster for the PVP / WOE and BG.";
+	close2;
+	getmapxy(@pvp_lmap$,@pvp_lx,@pvp_ly,UNITTYPE_PC);
+	warp "1@pop3",57,68;
+	sc_end SC_ALL;
+	end;
+
+L_BG:
+		if( BaseLevel < 79 )
+		{
+			mes "^404040[^808080" + strnpcinfo(1) + "^404040]^000000";
+			mes "You must be minimum level base 80 to access to the battleground.";
+			close;
+		}
+		if( checkquest(8506,PLAYTIME) == 2 ) erasequest 8506;
+		if( checkquest(8506,PLAYTIME) != -1 )
+		{
+			mes "^404040[^808080" + strnpcinfo(1) + "^404040]^000000";
+			mes "A marker indicates that you have recently accessed a game mode. I can not let you access the Battleground ["+checkquest(8506,PLAYTIME)+"/3min left].";
+			close;
+		}
+	mes "^404040[^808080" + strnpcinfo(1) + "^404040]^000000";
+	mes "BG Rules :";
+	mes " ";
+	mes "- It is forbidden to Kill Deco (that is kill a player, then immediately disconnect to avoid being killed).";
+	mes " ";
+	mes "- It is forbidden to Kill Raise (kill and revive the same player without his consent).";
+	mes " ";
+	mes "- It is strictly forbidden to Double Account to booster for the PVP / WOE and BG.";
+	close2;
+	warp "bat_room",155,150;
+	end;
+	
+OnTimer5000:
+	stopnpctimer;
+	set .nbr_joueurBG,bg_queue_data(getvariableofnpc(.BG_Queue,"BG_Queue_Join"),0);
+	set .@nbr_joueurPVP,(getmapusers("1@dth3")+getmapusers("1@lab")+getmapusers("1@mir"));
+	delwaitingroom;
+OnInit:
+	if(.nbr_joueurBG >=1) 
+		waitingroom .nbr_joueurBG + " Joueur"+(.nbr_joueurBG>1?"s":"")+" au BG",0;
+	else if(.@nbr_joueurPVP >=1) 
+		waitingroom .@nbr_joueurPVP + " Joueur"+(.@nbr_joueurPVP>1?"s":"")+" au PVP",0;
+	else
+		waitingroom "No players",0;
+	initnpctimer;
+	end;
+	
+OnBGGlobalStart:
+	while(bgcheck()) {
+		if(bg_queue_data(getvariableofnpc(.BG_Queue,"BG_Queue_Join"),0)>0)
+			specialeffect 367;
+		sleep 1500;
+	}
+	end;
+}
+1@pop3,53,62,0	script	Trou de sortie	10065,{
+	warp @pvp_lmap$,@pvp_lx,@pvp_ly;
+	end;
+}
+
+-	script	PVP Exit	10119,{
+	mes "[ ^1AAF9BPvP Warper^000000 ]";
+	mes "Hello ^0000ff"+strcharinfo(0)+"^000000 !";
+	mes "Do you want to exit Arena?";
+	next;
+	menu "Yes",L_Sortir,"No",-;
+	mes "[ ^1AAF9BPvP Warper^000000 ]";
+	mes "As you want.";
+	close;
+	
+L_Sortir:
+	close2;
+	dispbottom "[ Exit ] : Going back town in 3seconds.";
+	progressbar "green",3;
+	warp "SavePoint",0,0;
+	end;
+	
+}
+1@lab,121,119,4	duplicate(PVP Exit)	PVP Exit#1	10119
+1@lab,53,119,6	duplicate(PVP Exit)	PVP Exit#2	10119
+1@dth3,91,91,4	duplicate(PVP Exit)	PVP Exit#3	10119
+1@dth3,49,91,6	duplicate(PVP Exit)	PVP Exit#4	10119
+1@mir,68,112,6	duplicate(PVP Exit)	PVP Exit#5	10119
+1@mir,135,112,4	duplicate(PVP Exit)	PVP Exit#6	10119
+
+//====================================================================================
+
+1@pop3	mapflag	nosave	SavePoint
+1@pop3	mapflag	nowarp
+1@pop3	mapflag	noteleport
+1@pop3	mapflag	nomemo
+
+1@dth3	mapflag	nopenalty
+1@dth3	mapflag	nosave	SavePoint
+1@dth3	mapflag	nowarp
+1@dth3	mapflag	noteleport
+1@dth3	mapflag	nomemo
+1@dth3	mapflag	pvp
+1@dth3	mapflag	loadevent
+1@dth3	mapflag	noreturn
+1@dth3	mapflag	nobranch
+1@dth3	mapflag	pvp_noguild
+
+1@lab	mapflag	nopenalty
+1@lab	mapflag	nosave	SavePoint
+1@lab	mapflag	nowarp
+1@lab	mapflag	noteleport
+1@lab	mapflag	nomemo
+1@lab	mapflag	pvp
+1@lab	mapflag	loadevent
+1@lab	mapflag	noreturn
+1@lab	mapflag	nobranch
+1@lab	mapflag	pvp_noguild
+
+1@mir	mapflag	nopenalty
+1@mir	mapflag	nosave	SavePoint
+1@mir	mapflag	nowarp
+1@mir	mapflag	noteleport
+1@mir	mapflag	nomemo
+1@mir	mapflag	pvp
+1@mir	mapflag	loadevent
+1@mir	mapflag	noreturn
+1@mir	mapflag	nobranch
+1@mir	mapflag	pvp_noguild
