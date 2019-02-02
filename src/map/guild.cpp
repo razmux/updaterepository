@@ -108,7 +108,7 @@ int guild_skill_get_max (int id) {
 
 // Retrieve skill_lv learned by guild
 int guild_checkskill(struct guild *g, int id) {
-	if ((id = guild_skill_get_index(id)) < 0)
+	if ( g == nullptr || (id = guild_skill_get_index(id)) < 0)
 		return 0;
 	return g->skill[id].lv;
 }
@@ -247,11 +247,11 @@ int guild_getindex(struct guild *g,uint32 account_id,uint32 char_id) {
 }
 
 /// lookup: player sd -> member position
-int guild_getposition(struct guild* g, struct map_session_data* sd) {
+int guild_getposition(struct map_session_data* sd) {
 	int i;
+	struct guild *g;
 
-	if( g == NULL && (g=sd->guild) == NULL )
-		return -1;
+	nullpo_retr( -1, g = sd->guild );
 
 	ARR_FIND( 0, g->max_member, i, g->member[i].account_id == sd->status.account_id && g->member[i].char_id == sd->status.char_id );
 	return( i < g->max_member ) ? g->member[i].position : -1;
@@ -273,8 +273,8 @@ void guild_makemember(struct guild_member *m,struct map_session_data *sd) {
 //	m->exp_payper	= 0;
 	m->online		= 1;
 	m->position		= MAX_GUILDPOSITION-1;
-	memcpy(m->name,sd->status.name,NAME_LENGTH);
-	return;
+	safestrncpy(m->name,sd->status.name,NAME_LENGTH);
+	m->last_login	= (uint32)time(NULL);
 }
 
 /**
@@ -535,6 +535,11 @@ int guild_recv_info(struct guild *sg) {
 			bm++;
 	}
 
+	// Restore the instance id
+	if( !guild_new && before.instance_id ){
+		g->instance_id = before.instance_id;
+	}
+
 	for (i = 0; i < g->max_member; i++) { //Transmission of information at all members
 		sd = g->member[i].sd;
 		if( sd==NULL )
@@ -558,7 +563,7 @@ int guild_recv_info(struct guild *sg) {
 			clif_guild_skillinfo(sd); //Submit information skills
 
 		if (guild_new) { // Send information and affiliation if unsent
-			clif_guild_belonginfo(sd,g);
+			clif_guild_belonginfo(sd);
 			clif_guild_notice(sd);
 			sd->guild_emblem_id = g->emblem_id;
 		}
@@ -594,7 +599,7 @@ int guild_invite(struct map_session_data *sd, struct map_session_data *tsd) {
 	if(tsd==NULL || g==NULL)
 		return 0;
 
-	if( (i=guild_getposition(g,sd))<0 || !(g->position[i].mode&GUILD_PERM_INVITE) )
+	if( (i=guild_getposition(sd))<0 || !(g->position[i].mode&GUILD_PERM_INVITE) )
 		return 0; //Invite permission.
 
 	if(!battle_config.invite_request_check) {
@@ -748,7 +753,7 @@ int guild_member_added(int guild_id,uint32 account_id,uint32 char_id,int flag) {
 	sd->guild_emblem_id = g->emblem_id;
 	sd->guild = g;
 	//Packets which were sent in the previous 'guild_sent' implementation.
-	clif_guild_belonginfo(sd,g);
+	clif_guild_belonginfo(sd);
 	clif_guild_notice(sd);
 
 	//TODO: send new emblem info to others
@@ -806,7 +811,7 @@ int guild_expulsion(struct map_session_data* sd, int guild_id, uint32 account_id
 	if(sd->status.guild_id!=guild_id)
 		return 0;
 
-	if( (ps=guild_getposition(g,sd))<0 || !(g->position[ps].mode&GUILD_PERM_EXPEL) )
+	if( (ps=guild_getposition(sd))<0 || !(g->position[ps].mode&GUILD_PERM_EXPEL) )
 		return 0;	//Expulsion permission
 
 	//Can't leave inside guild castles.
@@ -971,7 +976,7 @@ int guild_send_memberinfoshort(struct map_session_data *sd,int online) { // clea
 	}
 
 	if(sd->state.connect_new) {	//Note that this works because it is invoked in parse_LoadEndAck before connect_new is cleared.
-		clif_guild_belonginfo(sd,g);
+		clif_guild_belonginfo(sd);
 		sd->guild_emblem_id = g->emblem_id;
 	}
 	return 0;
@@ -1184,7 +1189,7 @@ int guild_emblem_changed(int len,int guild_id,int emblem_id,const char *data) {
 	for(i=0;i<g->max_member;i++){
 		if((sd=g->member[i].sd)!=NULL){
 			sd->guild_emblem_id=emblem_id;
-			clif_guild_belonginfo(sd,g);
+			clif_guild_belonginfo(sd);
 			clif_guild_emblem(sd,g);
 			clif_guild_emblem_area(&sd->bl);
 		}
@@ -1256,7 +1261,7 @@ unsigned int guild_payexp(struct map_session_data *sd,unsigned int exp) {
 
 	if (sd->status.guild_id == 0 ||
 		(g = sd->guild) == NULL ||
-		(per = guild_getposition(g,sd)) < 0 ||
+		(per = guild_getposition(sd)) < 0 ||
 		(per = g->position[per].exp_mode) < 1)
 		return 0;
 
@@ -1725,7 +1730,7 @@ int castle_guild_broken_sub(DBKey key, DBData *data, va_list ap)
 		npc_event_do(name);
 
 		//Save the new 'owner', this should invoke guardian clean up and other such things.
-		guild_castledatasave(gc->castle_id, 1, 0);
+		guild_castledatasave(gc->castle_id, CD_GUILD_ID, 0);
 	}
 	return 0;
 }
@@ -1845,7 +1850,7 @@ int guild_gm_changed(int guild_id, uint32 account_id, uint32 char_id, time_t tim
 		if( g->member[i].sd && g->member[i].sd->fd ) {
 			clif_guild_basicinfo(g->member[i].sd);
 			clif_guild_memberlist(g->member[i].sd);
-			clif_guild_belonginfo(g->member[i].sd,g); // Update clientside guildmaster flag
+			clif_guild_belonginfo(g->member[i].sd); // Update clientside guildmaster flag
 		}
 	}
 
@@ -1965,7 +1970,7 @@ int guild_castledatasave(int castle_id, int index, int value) {
 	}
 
 	switch (index) {
-	case 1: // The castle's owner has changed? Update or remove Guardians too. [Skotlex]
+	case CD_GUILD_ID: // The castle's owner has changed? Update or remove Guardians too. [Skotlex]
 	{
 		int i;
 		gc->guild_id = value;
@@ -1976,9 +1981,9 @@ int guild_castledatasave(int castle_id, int index, int value) {
 		}
 		break;
 	}
-	case 2:
+	case CD_CURRENT_ECONOMY:
 		gc->economy = value; break;
-	case 3: // defense invest change -> recalculate guardian hp
+	case CD_CURRENT_DEFENSE: // defense invest change -> recalculate guardian hp
 	{
 		int i;
 		gc->defense = value;
@@ -1989,21 +1994,21 @@ int guild_castledatasave(int castle_id, int index, int value) {
 		}
 		break;
 	}
-	case 4:
+	case CD_INVESTED_ECONOMY:
 		gc->triggerE = value; break;
-	case 5:
+	case CD_INVESTED_DEFENSE:
 		gc->triggerD = value; break;
-	case 6:
+	case CD_NEXT_TIME:
 		gc->nextTime = value; break;
-	case 7:
+	case CD_PAY_TIME:
 		gc->payTime = value; break;
-	case 8:
+	case CD_CREATE_TIME:
 		gc->createTime = value; break;
-	case 9:
+	case CD_ENABLED_KAFRA:
 		gc->visibleC = value; break;
 	default:
-		if (index > 9 && index <= 9+MAX_GUARDIANS) {
-			gc->guardian[index-10].visible = value;
+		if (index >= CD_ENABLED_GUARDIAN00 && index < CD_MAX) {
+			gc->guardian[index - CD_ENABLED_GUARDIAN00].visible = value;
 			break;
 		}
 		ShowWarning("guild_castledatasave: index = '%d' is out of allowed range\n", index);
